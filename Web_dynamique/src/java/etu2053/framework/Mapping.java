@@ -13,8 +13,10 @@ public class Mapping {
     String method;
     
     public void setClassName(String CName){ this.className = CName; } 
-    public void setMethode(String Methode){ this.method= Methode; }
+    public void setMethod(String Methode){ this.method= Methode; }
     
     public String getClassName(){ return this.className; }
-    public String getMethode(){ return this.method; }
+    public String getMethod(){ return this.method; }
+
+    
 }
