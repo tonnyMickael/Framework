@@ -4,20 +4,37 @@
  */
 package etu2053.Framework.servlet;
 
+import etu2053.framework.Mapping;
+import etu2053.framework.annotation.Url;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.net.URL;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Set;
+import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
+import org.reflections.Reflections;
+import org.reflections.scanners.MethodAnnotationsScanner;
 /**
  *
  * @author andy
  */
 public class FrontServlet extends HttpServlet {
-
+    HashMap<String,Mapping> mappingUrls;
+    
+    @Override
+    public void init(ServletConfig config) throws ServletException {
+        super.init(config);
+        HashMap<String,Mapping> mappingUrl = FrontServlet.getAllMapping();
+        this.setMappingUrls(mappingUrl);
+    }
+    
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
      * methods.
@@ -27,22 +44,51 @@ public class FrontServlet extends HttpServlet {
      * @throws ServletException if a servlet-specific error occurs
      * @throws IOException if an I/O error occurs
      */
+     
+
     protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        response.setContentType("text/html;charset=UTF-8");
-        try (PrintWriter out = response.getWriter()) {
-            /* TODO output your page here. You may use following sample code. */
-            String URLtake=request.getRequestURL().toString()+"?"+request.getQueryString();
-            //String[] urltk=URLtake.split("[// / ?]+");
-            URL url=new URL(URLtake);
-            out.println("<!DOCTYPE html>");
-            out.println("<html>");
-            out.println("<head>");
-            out.println("<title>Servlet servlet</title>");            
-            out.println("</head>");
-            out.println("<body>");
-            out.println("<h1>le lien est " + URLtake + "</h1>");
-            out.println("</body>");
-            out.println("</html>");
+        PrintWriter out = response.getWriter();
+        out.println("Servlet : Front Servlet");
+        out.println("");
+        out.println("Context Path :"+request.getContextPath());
+        out.println("");
+        out.println("URL :"+request.getRequestURL());
+        out.println("");
+        out.println("Parametre :");
+        Enumeration<String> liste = request.getParameterNames();
+        while(liste.hasMoreElements()){
+            String element = liste.nextElement();
+            String[] elementValues = request.getParameterValues(element);
+            for(int i=0 ; i<elementValues.length ; i++){
+                out.println(element+" "+(i+1)+" : "+elementValues[i]);
+            }
+        }
+        out.println("");
+
+        out.println("Mapping Urls :");
+        HashMap<String,Mapping> mappingUrl = this.getMappingUrls();
+        Set keys = mappingUrl.keySet();
+        Iterator itr = keys.iterator();
+        while(itr.hasNext()){
+            String key = (String) itr.next();
+            out.print("Key : "+key+" , ");
+            out.println("Value : Class: "+mappingUrl.get(key).getClassName()+", Method: "+mappingUrl.get(key).getMethod());
+        }
+        
+        out.println("");
+        itr = keys.iterator();
+        while(itr.hasNext()){
+            String key = (String) itr.next();
+            if(key.equals(request.getServletPath())){
+                try {
+                    Class<?> classMapping = Class.forName("etu2053.framework.model."+mappingUrl.get(key).getClassName());
+                    Object objet = classMapping.newInstance();
+                    Method method = objet.getClass().getMethod(mappingUrl.get(key).getMethod());
+                    out.println("Action : "+String.valueOf(method.invoke(objet)));
+                } catch (ClassNotFoundException | IllegalAccessException | IllegalArgumentException | InstantiationException | NoSuchMethodException | SecurityException | InvocationTargetException ex) {
+                    out.println(ex.getMessage());
+                }
+            }
         }
     }
 
@@ -85,4 +131,30 @@ public class FrontServlet extends HttpServlet {
         return "Short description";
     }// </editor-fold>
 
+     public HashMap<String, Mapping> getMappingUrls() {
+        return mappingUrls;
+    }
+
+    public void setMappingUrls(HashMap<String, Mapping> mappingUrls) {
+        this.mappingUrls = mappingUrls;
+    }
+    
+    public static HashMap<String,Mapping> getAllMapping(){
+        HashMap<String , Mapping> mappingUrls = new HashMap<>();
+        Set<Method> method = new Reflections("etu2053.framework.model",new MethodAnnotationsScanner()).getMethodsAnnotatedWith(Url.class);
+        Iterator<Method> itr = method.iterator();
+        while(itr.hasNext()){
+            Method m = itr.next();
+            
+            Mapping tempMapping = new Mapping();
+            tempMapping.setClassName(m.getDeclaringClass().getSimpleName());
+            tempMapping.setMethod(m.getName());
+            
+            Url url = m.getAnnotation(Url.class);
+            String cle = url.lien();
+            
+            mappingUrls.put(cle, tempMapping);
+        }
+        return mappingUrls;
+    }
 }
